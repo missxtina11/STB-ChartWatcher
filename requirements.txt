@@ -11,4 +11,8 @@ matplotlib>=3.8
 >>>>>>> a646ada (Update xrpl-py to 4.2.0)
 =======
 openai==1.93.0
+<<<<<<< HEAD
 >>>>>>> 3093371 (Add openai==1.93.0 to requirements)
+=======
+openai>=1.0
+>>>>>>> f02ce25 (Add OpenAI SDK dependency)

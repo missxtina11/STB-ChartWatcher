@@ -1,8 +1,7 @@
-# stb_chartwatcher.py
+# echo_protocol_watcher.py
 import asyncio
 import logging
 import os
-from typing import Optional, Tuple
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
@@ -11,6 +10,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.types import Message
 from dotenv import load_dotenv
 
+# Local helpers
 from utils.chart_utils import plot_holder_distribution
 from utils.price_utils import fetch_price
 from utils.xrpl_utils import (
@@ -18,199 +18,136 @@ from utils.xrpl_utils import (
     get_bubble_map,
     get_big_txns,
     get_sentiment,
+    gpt_wallet_summary,
+    gpt_token_holders_analysis,
+    gpt_sentiment_from_trades,
 )
-from utils.token_store import add_token, remove_token, list_tokens
 
-# ─────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────
 #  Setup
-# ─────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 
+TG_BOT_TOKEN = os.getenv("TG_BOT_TOKEN")
+XRPL_WALLET_ADDRESS = os.getenv("XRPL_WALLET_ADDRESS")  # optional default wallet
+
 bot = Bot(
-    token=os.getenv("TG_BOT_TOKEN"),
+    token=TG_BOT_TOKEN,
     default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN),
 )
 dp = Dispatcher()
 
-
-# ─────────────────────────────────────────────────────────
-#  Helpers
-# ─────────────────────────────────────────────────────────
-def _resolve_token(chat_id: int, token_arg: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
-    """
-    Returns (token_code, issuer) or (None, error_msg)
-    """
-    watchlist = list_tokens(chat_id)
-    if token_arg:
-        token = token_arg.upper()
-        if token not in watchlist:
-            return None, f"❌ Token **{token}** is not in this chat’s watch-list."
-        return token, watchlist[token]
-    if watchlist:
-        token, issuer = next(iter(watchlist.items()))
-        return token, issuer
-    return None, "⚠️ No tokens watched yet. Use `addtoken <CODE> <ISSUER>`."
-
-
-# ─────────────────────────────────────────────────────────
-#  Core / help
-# ─────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────
+#  Core commands
+# ──────────────────────────────────────────────────────────────────────
 @dp.message(Command("start"))
-async def cmd_start(message: Message):
+async def cmd_start(message: Message) -> None:
     await message.answer(
-        "📊 *STB ChartWatcher Activated!*\n"
-        "Track holders, whales, trades, and sentiment.\n"
-        "Type `help` to view commands."
+        "🤖 *Echo Protocol Watcher Activated!*\n"
+        "Type /help to see available commands."
     )
 
 
 @dp.message(Command("help"))
-async def cmd_help(message: Message):
+async def cmd_help(message: Message) -> None:
     await message.answer(
         """
-*🛰️ STB ChartWatcher — Commands*
-
-holderschart [TOKEN] – Holder distribution chart  
-whales [TOKEN]       – Top whale wallets  
-bubbles [TOKEN]      – Bubble-map cluster summary  
-buysells [TOKEN]     – Large buy/sell tracker  
-sentiment [TOKEN]    – AI wallet sentiment  
-price [TOKEN]        – Current token price  
-
-addtoken <ISSUER>    – Add every token issued by that address
-listtokens           – Show watched tokens  
-removetoken <CODE>   – Remove token from list  
-
-status – Bot status
+*Echo Protocol Watcher — Commands*
+/holderschart – STB holder distribution
+/whales        – Top STB whale wallets
+/bubbles       – Bubble-map cluster summary
+/buysells      – Large buy/sell tracker
+/sentiment     – AI wallet sentiment
+/price         – STB price feed
+/gptwallet     – GPT wallet insight
+/gptholders    – GPT top-holders insight
+/gptsentiment  – GPT trade-sentiment scan
+/status        – Bot status
 """.strip()
     )
 
 
-# ─────────────────────────────────────────────────────────
-#  Token-management
-# ─────────────────────────────────────────────────────────
-from utils.xrpl_utils import currencies_for_issuer  # import at top with others
-
-@dp.message(Command("addtoken"))
-async def cmd_addtoken(message: Message):
-    parts = message.text.split(maxsplit=1)
-    if len(parts) != 2:
-        return await message.answer("❌ Usage: /addtoken <ISSUER_ADDRESS>")
-
-    issuer = parts[1].strip()
-    try:
-        codes = await currencies_for_issuer(issuer)
-    except Exception as e:
-        return await message.answer(f"❌ XRPL error: {e}")
-
-    if not codes:
-        return await message.answer("⚠️ This issuer has no currencies to add.")
-
-    for code in codes:
-        add_token(message.chat.id, code, issuer)
-
-    added = "\n".join([f"- **{c}**" for c in codes])
-    await message.answer(f"✅ Added token(s) issued by `{issuer}`:\n{added}")
-
-
-@dp.message(Command("listtokens"))
-async def cmd_listtokens(message: Message):
-    tokens = list_tokens(message.chat.id)
-    if not tokens:
-        return await message.answer("🗒️ No tokens are being watched yet.")
-    lines = [f"• **{c}** → `{i}`" for c, i in tokens.items()]
-    await message.answer("*Watched tokens:*\n" + "\n".join(lines))
-
-
-@dp.message(Command("removetoken"))
-async def cmd_removetoken(message: Message):
-    parts = message.text.split()
-    if len(parts) != 2:
-        return await message.answer("Usage:  removetoken `<CODE>`")
-    code = parts[1].upper()
-    remove_token(message.chat.id, code)
-    await message.answer(f"🗑️ Removed **{code}** from the watch-list (if it existed).")
-
-
-# ─────────────────────────────────────────────────────────
-#  Analytics commands
-# ─────────────────────────────────────────────────────────
 @dp.message(Command("holderschart"))
-async def cmd_holderschart(message: Message):
-    token_arg = message.text.split()[1] if len(message.text.split()) > 1 else None
-    code, err = _resolve_token(message.chat.id, token_arg)
-    if code is None:
-        return await message.answer(err)
-
-    path = plot_holder_distribution(code)
-    await message.answer_photo(types.FSInputFile(path), caption=f"📊 Holder chart for *{code}*")
+async def cmd_holders_chart(message: Message) -> None:
+    path = plot_holder_distribution()
+    await message.answer_photo(types.FSInputFile(path))
 
 
 @dp.message(Command("whales"))
-async def cmd_whales(message: Message):
-    token_arg = message.text.split()[1] if len(message.text.split()) > 1 else None
-    code, err = _resolve_token(message.chat.id, token_arg)
-    if code is None:
-        return await message.answer(err)
-
-    data = await get_whale_data(code)
-    await message.answer(f"🐳 *{code} Whales:*\n{data}")
+async def cmd_whales(message: Message) -> None:
+    await message.answer(await get_whale_data())
 
 
 @dp.message(Command("bubbles"))
-async def cmd_bubbles(message: Message):
-    token_arg = message.text.split()[1] if len(message.text.split()) > 1 else None
-    code, err = _resolve_token(message.chat.id, token_arg)
-    if code is None:
-        return await message.answer(err)
-
-    data = await get_bubble_map(code)
-    await message.answer(f"🧠 *{code} Bubble Map:*\n{data}")
+async def cmd_bubbles(message: Message) -> None:
+    await message.answer(await get_bubble_map())
 
 
 @dp.message(Command("buysells"))
-async def cmd_buysells(message: Message):
-    token_arg = message.text.split()[1] if len(message.text.split()) > 1 else None
-    code, err = _resolve_token(message.chat.id, token_arg)
-    if code is None:
-        return await message.answer(err)
-
-    data = await get_big_txns(code)
-    await message.answer(f"💸 *{code} Large Trades:*\n{data}")
+async def cmd_buysells(message: Message) -> None:
+    await message.answer(await get_big_txns())
 
 
 @dp.message(Command("sentiment"))
-async def cmd_sentiment(message: Message):
-    token_arg = message.text.split()[1] if len(message.text.split()) > 1 else None
-    code, err = _resolve_token(message.chat.id, token_arg)
-    if code is None:
-        return await message.answer(err)
-
-    data = await get_sentiment(code)
-    await message.answer(data)
+async def cmd_sentiment(message: Message) -> None:
+    await message.answer(await get_sentiment())
 
 
 @dp.message(Command("price"))
-async def cmd_price(message: Message):
-    token_arg = message.text.split()[1] if len(message.text.split()) > 1 else None
-    code, err = _resolve_token(message.chat.id, token_arg)
-    if code is None:
-        return await message.answer(err)
-
-    price = await fetch_price(code)
-    await message.answer(f"💰 *{code} Price:* `{price}`")
+async def cmd_price(message: Message) -> None:
+    price = await fetch_price()
+    await message.answer(f"💰 *STB Price:* `{price}`")
 
 
 @dp.message(Command("status"))
-async def cmd_status(message: Message):
-    await message.answer("✅ STB ChartWatcher is online and operational.")
+async def cmd_status(message: Message) -> None:
+    await message.answer("✅ Echo Protocol Watcher is online and operational.")
+
+# ──────────────────────────────────────────────────────────────────────
+#  GPT-powered commands
+#   (replace helper stubs with real data fetchers in utils/xrpl_utils.py)
+# ──────────────────────────────────────────────────────────────────────
+async def _get_wallet_tx_history(wallet: str) -> str:
+    """Placeholder – replace with real XRPL TX fetch."""
+    return f"Sample TX history for wallet {wallet}."
+
+async def _get_holder_list_summary() -> str:
+    """Placeholder – replace with real holder list."""
+    return "WalletA: 25%, WalletB: 18%, Others: 57%"
+
+async def _get_recent_trade_logs() -> str:
+    """Placeholder – replace with real trade logs."""
+    return "BUY 100k, SELL 50k, BUY 80k …"
+
+@dp.message(Command("gptwallet"))
+async def cmd_gpt_wallet(message: Message) -> None:
+    wallet = (
+        message.text.split(" ")[1] if len(message.text.split()) > 1 else XRPL_WALLET_ADDRESS
+    )
+    tx_data = await _get_wallet_tx_history(wallet)
+    response = await gpt_wallet_summary(tx_data)
+    await message.answer(response)
 
 
-# ─────────────────────────────────────────────────────────
+@dp.message(Command("gptholders"))
+async def cmd_gpt_holders(message: Message) -> None:
+    holder_data = await _get_holder_list_summary()
+    response = await gpt_token_holders_analysis(holder_data)
+    await message.answer(response)
+
+
+@dp.message(Command("gptsentiment"))
+async def cmd_gpt_sentiment(message: Message) -> None:
+    trade_logs = await _get_recent_trade_logs()
+    response = await gpt_sentiment_from_trades(trade_logs)
+    await message.answer(response)
+
+
+# ──────────────────────────────────────────────────────────────────────
 #  Entrypoint
-# ─────────────────────────────────────────────────────────
-async def main():
+# ──────────────────────────────────────────────────────────────────────
+async def main() -> None:
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
