@@ -5,9 +5,9 @@ import os
 from typing import Optional, Tuple
 
 from aiogram import Bot, Dispatcher, types
+from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
-from aiogram.client.default import DefaultBotProperties
 from aiogram.types import Message
 from dotenv import load_dotenv
 
@@ -21,9 +21,7 @@ from utils.xrpl_utils import (
 )
 from utils.token_store import add_token, remove_token, list_tokens
 
-# ─────────────────────────────────────────────────────────
-#  Setup
-# ─────────────────────────────────────────────────────────
+# ────────────────────────── Setup ──────────────────────────
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 
@@ -34,171 +32,136 @@ bot = Bot(
 dp = Dispatcher()
 
 
-# ─────────────────────────────────────────────────────────
-#  Helper: resolve which token the user means
-# ─────────────────────────────────────────────────────────
+# ─────────────────── Helper: resolve token ─────────────────
 def _resolve_token(chat_id: int, token_arg: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
-    """
-    Returns (token_code, issuer) or (None, error_msg)
-    """
     watchlist = list_tokens(chat_id)
     if token_arg:
-        token = token_arg.upper()
-        if token not in watchlist:
-            return None, f"❌ Token **{token}** is not in this chat’s watch-list."
-        return token, watchlist[token]
-
-    if watchlist:  # default to first watched token
-        token, issuer = next(iter(watchlist.items()))
-        return token, issuer
-
+        tok = token_arg.upper()
+        if tok not in watchlist:
+            return None, f"❌ Token **{tok}** is not in this chat’s watch-list."
+        return tok, watchlist[tok]
+    if watchlist:
+        tok, issuer = next(iter(watchlist.items()))
+        return tok, issuer
     return None, "⚠️ No tokens watched yet. Use `addtoken <CODE> <ISSUER>`."
 
 
-# ─────────────────────────────────────────────────────────
-#  Start / Help
-# ─────────────────────────────────────────────────────────
+# ────────────────────── Core commands ──────────────────────
 @dp.message(Command("start"))
-async def cmd_start(message: Message):
-    await message.answer(
-        "📊 *STB ChartWatcher Activated!*\n"
+async def cmd_start(msg: Message):
+    await msg.answer(
+        "📊 *STB ChartWatcher Activated!*  \n"
         "Track holders, whales, trades, and sentiment.\n"
-        "Type `help` to view commands."
+        "Type `help` for commands."
     )
 
 
 @dp.message(Command("help"))
-async def cmd_help(message: Message):
-    await message.answer(
+async def cmd_help(msg: Message):
+    await msg.answer(
         """
 *🛰️ STB ChartWatcher — Commands*
 
-holderschart [TOKEN] – Holder distribution chart  
-whales [TOKEN]       – Top whale wallets  
-bubbles [TOKEN]      – Bubble-map wallet clusters  
-buysells [TOKEN]     – Large buy/sell tracker  
-sentiment [TOKEN]    – AI wallet sentiment  
-price [TOKEN]        – Current token price  
+holderschart [TOKEN] – Holder distribution  
+whales [TOKEN]       – Top wallets  
+bubbles [TOKEN]      – Wallet clusters  
+buysells [TOKEN]     – Large trades  
+sentiment [TOKEN]    – AI sentiment  
+price [TOKEN]        – Current price  
 
-addtoken <CODE> <ISSUER> – Add token to watch-list  
+addtoken <CODE> <ISSUER> – Add to watch-list  
 listtokens                – Show watched tokens  
-removetoken <CODE>        – Remove token from list  
-
-status – Bot status
+removetoken <CODE>        – Remove token  
+status                    – Bot status
 """.strip()
     )
 
 
-# ─────────────────────────────────────────────────────────
-#  Token management
-# ─────────────────────────────────────────────────────────
+# ───────────── Token-list management ─────────────
 @dp.message(Command("addtoken"))
-async def cmd_addtoken(message: Message):
-    parts = message.text.split()
-    if len(parts) != 3:
-        return await message.answer("Usage:  addtoken `<CODE>` `<ISSUER_ADDRESS>`")
-
-    code, issuer = parts[1].upper(), parts[2]
-    add_token(message.chat.id, code, issuer)
-    await message.answer(f"✅ Added **{code}** to this chat’s watch-list.")
+async def cmd_addtoken(msg: Message):
+    p = msg.text.split()
+    if len(p) != 3:
+        return await msg.answer("Usage: `addtoken <CODE> <ISSUER_ADDRESS>`")
+    code, issuer = p[1].upper(), p[2]
+    add_token(msg.chat.id, code, issuer)
+    await msg.answer(f"✅ Added **{code}** to this chat’s watch-list.")
 
 
 @dp.message(Command("listtokens"))
-async def cmd_listtokens(message: Message):
-    tokens = list_tokens(message.chat.id)
-    if not tokens:
-        return await message.answer("🗒️ No tokens are being watched yet.")
-    lines = [f"• **{c}** → `{i}`" for c, i in tokens.items()]
-    await message.answer("*Watched tokens:*\n" + "\n".join(lines))
+async def cmd_listtokens(msg: Message):
+    t = list_tokens(msg.chat.id)
+    if not t:
+        return await msg.answer("🗒️ No tokens watched yet.")
+    lines = [f"• **{c}** → `{i}`" for c, i in t.items()]
+    await msg.answer("*Watched tokens:*\n" + "\n".join(lines))
 
 
 @dp.message(Command("removetoken"))
-async def cmd_removetoken(message: Message):
-    parts = message.text.split()
-    if len(parts) != 2:
-        return await message.answer("Usage:  removetoken `<CODE>`")
-    code = parts[1].upper()
-    remove_token(message.chat.id, code)
-    await message.answer(f"🗑️ Removed **{code}** from the watch-list (if it existed).")
+async def cmd_removetoken(msg: Message):
+    p = msg.text.split()
+    if len(p) != 2:
+        return await msg.answer("Usage: `removetoken <CODE>`")
+    remove_token(msg.chat.id, p[1].upper())
+    await msg.answer("🗑️ Removed from watch-list (if it existed).")
 
 
-# ─────────────────────────────────────────────────────────
-#  Analytics commands
-# ─────────────────────────────────────────────────────────
+# ───────────── Analytics commands ─────────────
 @dp.message(Command("holderschart"))
-async def cmd_holderschart(message: Message):
-    token_arg = message.text.split()[1] if len(message.text.split()) > 1 else None
-    code, err = _resolve_token(message.chat.id, token_arg)
-    if code is None:
-        return await message.answer(err)
-
-    path = plot_holder_distribution(code)
-    await message.answer_photo(types.FSInputFile(path), caption=f"📊 Holder chart for *{code}*")
+async def cmd_holderschart(msg: Message):
+    tok, err = _resolve_token(msg.chat.id, msg.text.split()[1:] and msg.text.split()[1])
+    if tok is None:
+        return await msg.answer(err)
+    path = plot_holder_distribution(tok)
+    await msg.answer_photo(types.FSInputFile(path), caption=f"📊 Holder chart for *{tok}*")
 
 
 @dp.message(Command("whales"))
-async def cmd_whales(message: Message):
-    token_arg = message.text.split()[1] if len(message.text.split()) > 1 else None
-    code, err = _resolve_token(message.chat.id, token_arg)
-    if code is None:
-        return await message.answer(err)
-
-    data = await get_whale_data(code)
-    await message.answer(f"🐳 *{code} Whales:*\n{data}")
+async def cmd_whales(msg: Message):
+    tok, err = _resolve_token(msg.chat.id, msg.text.split()[1:] and msg.text.split()[1])
+    if tok is None:
+        return await msg.answer(err)
+    await msg.answer(f"🐳 *{tok} Whales:*\n" + await get_whale_data(tok))
 
 
 @dp.message(Command("bubbles"))
-async def cmd_bubbles(message: Message):
-    token_arg = message.text.split()[1] if len(message.text.split()) > 1 else None
-    code, err = _resolve_token(message.chat.id, token_arg)
-    if code is None:
-        return await message.answer(err)
-
-    data = await get_bubble_map(code)
-    await message.answer(f"🧠 *{code} Bubble Map:*\n{data}")
+async def cmd_bubbles(msg: Message):
+    tok, err = _resolve_token(msg.chat.id, msg.text.split()[1:] and msg.text.split()[1])
+    if tok is None:
+        return await msg.answer(err)
+    await msg.answer(f"🧠 *{tok} Bubble Map:*\n" + await get_bubble_map(tok))
 
 
 @dp.message(Command("buysells"))
-async def cmd_buysells(message: Message):
-    token_arg = message.text.split()[1] if len(message.text.split()) > 1 else None
-    code, err = _resolve_token(message.chat.id, token_arg)
-    if code is None:
-        return await message.answer(err)
-
-    data = await get_big_txns(code)
-    await message.answer(f"💸 *{code} Large Trades:*\n{data}")
+async def cmd_buysells(msg: Message):
+    tok, err = _resolve_token(msg.chat.id, msg.text.split()[1:] and msg.text.split()[1])
+    if tok is None:
+        return await msg.answer(err)
+    await msg.answer(f"💸 *{tok} Trades:*\n" + await get_big_txns(tok))
 
 
 @dp.message(Command("sentiment"))
-async def cmd_sentiment(message: Message):
-    token_arg = message.text.split()[1] if len(message.text.split()) > 1 else None
-    code, err = _resolve_token(message.chat.id, token_arg)
-    if code is None:
-        return await message.answer(err)
-
-    data = await get_sentiment(code)
-    await message.answer(data)
+async def cmd_sentiment(msg: Message):
+    tok, err = _resolve_token(msg.chat.id, msg.text.split()[1:] and msg.text.split()[1])
+    if tok is None:
+        return await msg.answer(err)
+    await msg.answer(await get_sentiment(tok))
 
 
 @dp.message(Command("price"))
-async def cmd_price(message: Message):
-    token_arg = message.text.split()[1] if len(message.text.split()) > 1 else None
-    code, err = _resolve_token(message.chat.id, token_arg)
-    if code is None:
-        return await message.answer(err)
-
-    price = await fetch_price(code)
-    await message.answer(f"💰 *{code} Price:* `{price}`")
+async def cmd_price(msg: Message):
+    tok, err = _resolve_token(msg.chat.id, msg.text.split()[1:] and msg.text.split()[1])
+    if tok is None:
+        return await msg.answer(err)
+    await msg.answer(f"💰 *{tok} Price:* `{await fetch_price(tok)}`")
 
 
 @dp.message(Command("status"))
-async def cmd_status(message: Message):
-    await message.answer("✅ STB ChartWatcher is online and operational.")
+async def cmd_status(msg: Message):
+    await msg.answer("✅ STB ChartWatcher is online.")
 
 
-# ─────────────────────────────────────────────────────────
-#  Entrypoint
-# ─────────────────────────────────────────────────────────
+# ─────────────────── Entrypoint ───────────────────
 async def main():
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)

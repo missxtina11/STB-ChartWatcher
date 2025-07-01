@@ -218,3 +218,20 @@ async def get_big_txns(token_code: Optional[str] = None) -> str:
 async def get_sentiment(token_code: Optional[str] = None) -> str:
     return "🧠 Sentiment: Neutral ➡️ Slight Bullish"
 
+# utils/xrpl_utils.py (append at bottom)
+
+from xrpl.asyncio.clients import AsyncJsonRpcClient
+from xrpl.models.requests import AccountCurrencies
+import os
+
+XRPL_RPC = os.getenv("XRPL_RPC", "https://xrplcluster.com")
+
+async def currencies_for_issuer(issuer: str) -> list[str]:
+    """
+    Return a list of currency codes issued by `issuer`.
+    """
+    client = AsyncJsonRpcClient(XRPL_RPC)
+    req = AccountCurrencies(account=issuer)
+    resp = await client.request(req)
+    return resp.result.get("send_currencies", [])
+

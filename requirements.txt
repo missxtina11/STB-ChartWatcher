@@ -1,8 +1,11 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 xrpl-py>=4.2.0
 openai>=1.0
 
 =======
+=======
+>>>>>>> 2c3b078 (Add main bot script after cleanup)
 aiogram==3.3.0
 python-dotenv>=1.0
 xrpl-py==4.2.0
@@ -15,4 +18,11 @@ openai==1.93.0
 >>>>>>> 3093371 (Add openai==1.93.0 to requirements)
 =======
 openai>=1.0
+<<<<<<< HEAD
 >>>>>>> f02ce25 (Add OpenAI SDK dependency)
+=======
+=======
+xrpl-py>=4.2.0
+
+>>>>>>> ba05a3a (addtoken now takes issuer-only and auto-detects currencies)
+>>>>>>> 2c3b078 (Add main bot script after cleanup)
