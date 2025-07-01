@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 import random
 
 async def fetch_price(token: str) -> str:
@@ -11,13 +12,21 @@ async def fetch_price(token: str) -> str:
 
 =======
 <<<<<<< HEAD
-# utils/price_utils.py
-async def fetch_price():
-    return "0.000067 XRP/STB"
 =======
-async def fetch_price(token_code: str | None = None) -> str:
-    """Return a placeholder price for now."""
+>>>>>>> 720f448 (Clean conflict markers from price_utils.py)
+# utils/price_utils.py
+from typing import Optional
+
+async def fetch_price(token_code: Optional[str] = None) -> str:
+    """
+    Placeholder price fetcher.
+    Replace with a real API/XRPL DEX lookup later.
+    """
+    # Dummy static price
     return "0.000065"
 
+<<<<<<< HEAD
 >>>>>>> 7d74048 (Push full STB ChartWatcher bot)
 >>>>>>> ec10f73 (Clean up bytecode and cache)
+=======
+>>>>>>> 720f448 (Clean conflict markers from price_utils.py)
