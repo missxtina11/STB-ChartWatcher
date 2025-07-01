@@ -1,6 +1,5 @@
-<<<<<<< HEAD
-# utils/xrpl_utils.py
 """
+<<<<<<< HEAD
 <<<<<<< HEAD
 XRPL + GPT helper layer for STB-ChartWatcher.
 
@@ -174,98 +173,48 @@ async def get_sentiment() -> str:
 >>>>>>> 1b17b63 (Initial upload of Echo Protocol Watcher code)
 
 import openai
-import os
-
-openai.api_key = os.getenv("OPENAI_API_KEY")
-GPT_MODEL = os.getenv("GPT_MODEL", "gpt-4o")
-GPT_ENABLED = os.getenv("ENABLE_GPT_WALLET_INSIGHTS", "false").lower() == "true"
-
-async def gpt_wallet_summary(wallet_data: str):
-    if not GPT_ENABLED:
-        return "🧠 GPT Wallet Insights are disabled."
-
-    prompt = (
-        "You are an expert blockchain analyst. Analyze the following XRPL wallet activity. "
-        "Summarize the wallet’s behavior, risk profile, trading habits, and potential classification "
-        "(e.g., holder, sniper, whale, bot, LP provider).\n\n"
-        f"{wallet_data}"
-    )
-    try:
-        response = openai.ChatCompletion.create(
-            model=GPT_MODEL,
-            messages=[
-                {"role": "system", "content": "You are a blockchain wallet analyst."},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=400,
-            temperature=0.6,
-        )
-        return "🧠 GPT Insight:\n" + response.choices[0].message.content.strip()
-    except Exception as e:
-        return f"❌ GPT error: {str(e)}"
-
-async def gpt_token_holders_analysis(holder_data: str):
-    if not GPT_ENABLED:
-        return "🧠 GPT Token Holder Analysis is disabled."
-
-    prompt = (
-        "You are an expert XRPL token analyst. Analyze this list of token holders and their holdings. "
-        "Identify possible whales, influencers, suspicious patterns, and concentration risk:\n\n"
-        f"{holder_data}"
-    )
-    try:
-        response = openai.ChatCompletion.create(
-            model=GPT_MODEL,
-            messages=[
-                {"role": "system", "content": "You analyze token holder distribution."},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=350,
-            temperature=0.5,
-        )
-        return "📊 Holder Analysis:\n" + response.choices[0].message.content.strip()
-    except Exception as e:
-        return f"❌ GPT error: {str(e)}"
-
-async def gpt_sentiment_from_trades(trade_logs: str):
-    if not GPT_ENABLED:
-        return "🧠 GPT Sentiment Scan is disabled."
-
-    prompt = (
-        "You are a sentiment AI. Given this recent trading log from the XRPL, determine whether the market "
-        "is trending bullish, bearish, or uncertain. Provide a brief justification:\n\n"
-        f"{trade_logs}"
-    )
-    try:
-        response = openai.ChatCompletion.create(
-            model=GPT_MODEL,
-            messages=[
-                {"role": "system", "content": "You analyze crypto trading sentiment."},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=250,
-            temperature=0.4,
-        )
-        return "📈 Sentiment Analysis:\n" + response.choices[0].message.content.strip()
-    except Exception as e:
-        return f"❌ GPT error: {str(e)}"
 =======
-"""
-Stub XRPL helpers.
-Each function accepts token_code (str | None) but returns placeholder data.
-Replace with real XRPL queries when ready.
+XRPL helper stubs for STB ChartWatcher.
+Replace the placeholder logic with real XRPL queries when ready.
 """
 
-async def get_whale_data(token_code: str | None = None):
+from typing import List, Optional
+>>>>>>> f20f4e2 (Remove conflict markers; clean xrpl_utils)
+import os
+from xrpl.asyncio.clients import AsyncJsonRpcClient
+from xrpl.models.requests import AccountCurrencies
+
+# ─────────────────────────────────────────────────────────
+#  XRPL RPC
+# ─────────────────────────────────────────────────────────
+XRPL_RPC = os.getenv("XRPL_RPC", "https://xrplcluster.com")
+
+
+# ─────────────────────────────────────────────────────────
+#  Issuer → currency list
+# ─────────────────────────────────────────────────────────
+async def currencies_for_issuer(issuer: str) -> List[str]:
+    """
+    Return a list of currency codes issued by `issuer`.
+    """
+    client = AsyncJsonRpcClient(XRPL_RPC)
+    req = AccountCurrencies(account=issuer)
+    resp = await client.request(req)
+    return resp.result.get("send_currencies", [])
+
+
+# ─────────────────────────────────────────────────────────
+#  Analytics stubs (replace with live data later)
+# ─────────────────────────────────────────────────────────
+async def get_whale_data(token_code: Optional[str] = None) -> str:
     return "WalletA – 25%\nWalletB – 18%\nOthers – 57%"
 
-async def get_bubble_map(token_code: str | None = None):
+async def get_bubble_map(token_code: Optional[str] = None) -> str:
     return "Cluster A (42 %)\nCluster B (30 %)\nLong tail"
 
-async def get_big_txns(token_code: str | None = None):
+async def get_big_txns(token_code: Optional[str] = None) -> str:
     return "BUY 120 k @ 0.000065\nSELL 80 k @ 0.000067"
 
-async def get_sentiment(token_code: str | None = None):
+async def get_sentiment(token_code: Optional[str] = None) -> str:
     return "🧠 Sentiment: Neutral ➡️ Slight Bullish"
->>>>>>> 7d74048 (Push full STB ChartWatcher bot)
 
