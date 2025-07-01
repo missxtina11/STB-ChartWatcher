@@ -1,15 +1,22 @@
-# Ignore Python cache
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+*.so
 
-# Ignore virtual environments
+# Virtual environment folders
 .venv/
 env/
 venv/
 
-# Ignore environment config
+# Environment variables and secrets
 .env
 
-# Other files
+# Logs
 *.log
+
+# VSCode settings (optional)
+.vscode/
+
+# Mac system files (optional)
+.DS_Store
 
