@@ -7,4 +7,8 @@ aiogram==3.3.0
 python-dotenv>=1.0
 xrpl-py==4.2.0
 matplotlib>=3.8
+<<<<<<< HEAD
 >>>>>>> a646ada (Update xrpl-py to 4.2.0)
+=======
+openai==1.93.0
+>>>>>>> 3093371 (Add openai==1.93.0 to requirements)
