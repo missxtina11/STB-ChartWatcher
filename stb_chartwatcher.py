@@ -68,7 +68,7 @@ dp = Dispatcher()
 
 
 # ─────────────────────────────────────────────────────────
-#  Helpers
+#  Helper: resolve which token the user means
 # ─────────────────────────────────────────────────────────
 def _resolve_token(chat_id: int, token_arg: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
     """
@@ -80,14 +80,16 @@ def _resolve_token(chat_id: int, token_arg: Optional[str]) -> Tuple[Optional[str
         if token not in watchlist:
             return None, f"❌ Token **{token}** is not in this chat’s watch-list."
         return token, watchlist[token]
-    if watchlist:
+
+    if watchlist:  # default to first watched token
         token, issuer = next(iter(watchlist.items()))
         return token, issuer
+
     return None, "⚠️ No tokens watched yet. Use `addtoken <CODE> <ISSUER>`."
 
 
 # ─────────────────────────────────────────────────────────
-#  Core / help
+#  Start / Help
 # ─────────────────────────────────────────────────────────
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
@@ -106,7 +108,7 @@ async def cmd_help(message: Message):
 
 holderschart [TOKEN] – Holder distribution chart  
 whales [TOKEN]       – Top whale wallets  
-bubbles [TOKEN]      – Bubble-map cluster summary  
+bubbles [TOKEN]      – Bubble-map wallet clusters  
 buysells [TOKEN]     – Large buy/sell tracker  
 sentiment [TOKEN]    – AI wallet sentiment  
 price [TOKEN]        – Current token price  
@@ -121,13 +123,14 @@ status – Bot status
 
 
 # ─────────────────────────────────────────────────────────
-#  Token-management
+#  Token management
 # ─────────────────────────────────────────────────────────
 @dp.message(Command("addtoken"))
 async def cmd_addtoken(message: Message):
     parts = message.text.split()
     if len(parts) != 3:
         return await message.answer("Usage:  addtoken `<CODE>` `<ISSUER_ADDRESS>`")
+
     code, issuer = parts[1].upper(), parts[2]
     add_token(message.chat.id, code, issuer)
     await message.answer(f"✅ Added **{code}** to this chat’s watch-list.")

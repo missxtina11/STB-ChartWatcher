@@ -64,9 +64,8 @@ OUTPUT_DIR = os.getenv("CHART_OUTPUT_PATH") or tempfile.gettempdir()
 def plot_holder_distribution(token_code: Optional[str] = None) -> str:
     """
     Generate a placeholder pie chart of holder distribution.
-    Replace dummy data with real chain data when ready.
+    Replace dummy data with real stats when ready.
     """
-    # Dummy data
     holders = ["Top 1", "Top 2", "Others"]
     shares = [25, 15, 60]
 
