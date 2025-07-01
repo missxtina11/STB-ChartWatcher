@@ -78,9 +78,9 @@ buysells [TOKEN]     – Large buy/sell tracker
 sentiment [TOKEN]    – AI wallet sentiment  
 price [TOKEN]        – Current token price  
 
-addtoken <CODE> <ISSUER> – Add token to watch-list  
-listtokens                – Show watched tokens  
-removetoken <CODE>        – Remove token from list  
+addtoken <ISSUER>    – Add every token issued by that address
+listtokens           – Show watched tokens  
+removetoken <CODE>   – Remove token from list  
 
 status – Bot status
 """.strip()
@@ -90,14 +90,28 @@ status – Bot status
 # ─────────────────────────────────────────────────────────
 #  Token-management
 # ─────────────────────────────────────────────────────────
+from utils.xrpl_utils import currencies_for_issuer  # import at top with others
+
 @dp.message(Command("addtoken"))
 async def cmd_addtoken(message: Message):
-    parts = message.text.split()
-    if len(parts) != 3:
-        return await message.answer("Usage:  addtoken `<CODE>` `<ISSUER_ADDRESS>`")
-    code, issuer = parts[1].upper(), parts[2]
-    add_token(message.chat.id, code, issuer)
-    await message.answer(f"✅ Added **{code}** to this chat’s watch-list.")
+    parts = message.text.split(maxsplit=1)
+    if len(parts) != 2:
+        return await message.answer("❌ Usage: /addtoken <ISSUER_ADDRESS>")
+
+    issuer = parts[1].strip()
+    try:
+        codes = await currencies_for_issuer(issuer)
+    except Exception as e:
+        return await message.answer(f"❌ XRPL error: {e}")
+
+    if not codes:
+        return await message.answer("⚠️ This issuer has no currencies to add.")
+
+    for code in codes:
+        add_token(message.chat.id, code, issuer)
+
+    added = "\n".join([f"- **{c}**" for c in codes])
+    await message.answer(f"✅ Added token(s) issued by `{issuer}`:\n{added}")
 
 
 @dp.message(Command("listtokens"))
