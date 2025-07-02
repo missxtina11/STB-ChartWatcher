@@ -1,12 +1,15 @@
 # stb_chartwatcher.py
 """
-STB-ChartWatcher – Telegram bot for XRPL token analytics
-Requires:
-  • python-telegram-bot aiogram v3
-  • openai  >=1.0   (for GPT features)
-  • utils/… helper modules shipped with this repo
+STB-ChartWatcher – Telegram bot for XRPL token analytics.
 
-Set TG_BOT_TOKEN and OPENAI_API_KEY in your .env
+Requires:
+  • aiogram ≥ 3
+  • openai ≥ 1.0  (for GPT features)
+  • Helper modules in utils/
+
+Environment (.env):
+  TG_BOT_TOKEN=<telegram token>
+  OPENAI_API_KEY=<openai key>
 """
 
 import asyncio
@@ -21,7 +24,7 @@ from aiogram.filters import Command
 from aiogram.types import Message, BotCommand
 from dotenv import load_dotenv
 
-# Local helpers
+# ─────────────── Local helpers ────────────────
 from utils.chart_utils import plot_holder_distribution
 from utils.price_utils import fetch_price
 from utils.xrpl_utils import (
@@ -38,7 +41,7 @@ from utils.xrpl_utils import (
 )
 from utils.token_store import add_token, remove_token, list_tokens
 
-# ─────────────────────────── Setup ────────────────────────────
+# ─────────────────── Setup ─────────────────────
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 
@@ -48,7 +51,7 @@ bot = Bot(
 )
 dp = Dispatcher()
 
-# ─────────── Simple in-memory wallet watch (demo) ────────────
+# ───── In-memory wallet watch-lists (demo) ─────
 _WALLET_WATCH: Dict[int, Set[str]] = {}  # chat_id → {wallet,…}
 
 
@@ -60,79 +63,51 @@ def _list_wallets(chat_id: int) -> Set[str]:
     return _WALLET_WATCH.get(chat_id, set())
 
 
-# ────────────────── helper: resolve token ────────────────────
+# ───────────── Helper: resolve token ───────────
 def _resolve_token(chat_id: int, arg: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
     """
     Returns (token_code, issuer) or (None, error_msg)
     """
     wl = list_tokens(chat_id)
     if arg:
-        t = arg.upper()
-        if t not in wl:
-            return None, f"❌ Token **{t}** is not in this chat’s watch-list."
-        return t, wl[t]
+        tok = arg.upper()
+        if tok not in wl:
+            return None, f"❌ Token **{tok}** is not being watched."
+        return tok, wl[tok]
     if wl:
-        t, iss = next(iter(wl.items()))
-        return t, iss
+        tok, iss = next(iter(wl.items()))
+        return tok, iss
     return None, "⚠️ No tokens watched yet. Use `addtoken <CODE> <ISSUER>`."
 
 
-# ─────────────────────── /start & /help ───────────────────────
+# ─────────────── /start & /help ────────────────
 @dp.message(Command("start"))
 async def cmd_start(m: Message):
-
-from aiogram.types import BotCommand
-
-# …
-
-@dp.message(Command("start"))
-async def cmd_start(msg: Message):
-    await msg.answer(
+    await m.answer(
         "📊 *STB ChartWatcher Activated!*  \n"
         "Track holders, whales, trades, and sentiment.\n"
         "Type `help` for commands."
     )
 
-    # Register the main commands with Telegram (done once every /start)
+    # one-time command menu for Telegram’s UI
     await bot.set_my_commands(
         [
-            BotCommand(command="help", description="Show help"),
-            BotCommand(command="addtoken", description="Add token to watch-list"),
-            BotCommand(command="listtokens", description="List watched tokens"),
-            BotCommand(command="removetoken", description="Remove token"),
-            BotCommand(command="holderschart", description="Holder pie chart"),
-            BotCommand(command="whales", description="Top wallets"),
-            BotCommand(command="bubbles", description="Wallet clusters"),
-            BotCommand(command="buysells", description="Large trades"),
-            BotCommand(command="sentiment", description="AI sentiment"),
-            BotCommand(command="price", description="Token price"),
-            BotCommand(command="status", description="Bot status"),
+            BotCommand(command="help",         description="Show help"),
+            BotCommand(command="addtoken",     description="Add token"),
+            BotCommand(command="listtokens",   description="List tokens"),
+            BotCommand(command="removetoken",  description="Remove token"),
+            BotCommand(command="addwallet",    description="Watch wallet"),
+            BotCommand(command="holderschart", description="Holder pie-chart"),
+            BotCommand(command="whales",       description="Top wallets"),
+            BotCommand(command="bubbles",      description="Wallet clusters"),
+            BotCommand(command="buysells",     description="Large trades"),
+            BotCommand(command="sentiment",    description="AI sentiment"),
+            BotCommand(command="price",        description="Token price"),
+            BotCommand(command="gptwallet",    description="GPT wallet summary"),
+            BotCommand(command="gptsentiment", description="GPT sentiment"),
+            BotCommand(command="gpt_holders",  description="GPT holder analysis"),
+            BotCommand(command="status",       description="Bot status"),
         ]
-    )
-
-    await bot.set_my_commands(
-        [
-            BotCommand("help", "Show help"),
-            BotCommand("addtoken", "Add a token"),
-            BotCommand("listtokens", "List tokens"),
-            BotCommand("removetoken", "Remove token"),
-            BotCommand("addwallet", "Watch a wallet"),
-            BotCommand("holderschart", "Holder chart"),
-            BotCommand("whales", "Whale wallets"),
-            BotCommand("bubbles", "Bubble map"),
-            BotCommand("buysells", "Large trades"),
-            BotCommand("sentiment", "AI sentiment"),
-            BotCommand("price", "Token price"),
-            BotCommand("gptwallet", "GPT wallet summary"),
-            BotCommand("gptsentiment", "GPT sentiment"),
-            BotCommand("gpt_holders", "GPT holder analysis"),
-            BotCommand("status", "Bot status"),
-        ]
-    )
-    await m.answer(
-        "📊 *STB ChartWatcher Activated!*\n"
-        "Track holders, whales, trades, and sentiment.\n"
-        "Type `help` for commands."
     )
 
 
@@ -162,7 +137,7 @@ status – Bot status
 """.strip()
     )
 
-# ─────────────── Token-watch commands ───────────────
+# ───────────── Token-watch commands ─────────────
 @dp.message(Command("addtoken"))
 async def cmd_addtoken(m: Message):
     p = m.text.split()
@@ -189,9 +164,9 @@ async def cmd_removetoken(m: Message):
     if len(p) != 2:
         return await m.answer("Usage: `removetoken <CODE>`")
     remove_token(m.chat.id, p[1].upper())
-    await m.answer("🗑️ Removed (if it existed).")
+    await m.answer("��️ Removed (if it existed).")
 
-# ─────────────── Wallet-watch commands ───────────────
+# ───────────── Wallet-watch commands ────────────
 @dp.message(Command("addwallet"))
 async def cmd_addwallet(m: Message):
     p = m.text.split()
@@ -200,7 +175,7 @@ async def cmd_addwallet(m: Message):
     _add_wallet(m.chat.id, p[1])
     await m.answer("👀 Wallet added to watch-list.")
 
-# ─────────────── Analytics commands ───────────────
+# ───────────── Analytics commands ───────────────
 @dp.message(Command("holderschart"))
 async def cmd_holderschart(m: Message):
     tok, err = _resolve_token(m.chat.id, m.text.split()[1] if len(m.text.split()) > 1 else None)
@@ -249,7 +224,7 @@ async def cmd_price(m: Message):
         return await m.answer(err)
     await m.answer(f"💰 *{tok} Price:* `{await fetch_price(tok)}`")
 
-# ─────────────── GPT-powered commands ───────────────
+# ───────────── GPT-powered commands ─────────────
 @dp.message(Command("gptwallet"))
 async def cmd_gptwallet(m: Message):
     target = m.text.split()[1] if len(m.text.split()) > 1 else None
@@ -282,7 +257,7 @@ async def cmd_gpt_holders(m: Message):
     out = await gpt_token_holders_analysis(stats)
     await m.answer(f"*GPT Holder Analysis for {tok}*\n\n{out}")
 
-# ─────────────── Misc ───────────────
+# ─────────────── Miscellaneous ────────────────
 @dp.message(Command("status"))
 async def cmd_status(m: Message):
     await m.answer("✅ STB ChartWatcher is online.")
@@ -292,8 +267,7 @@ async def cmd_status(m: Message):
 async def fallback(m: Message):
     await m.answer("🤖 I didn’t understand that. Try /help.")
 
-
-# ───────────────── Entrypoint ─────────────────
+# ───────────────── Entrypoint ──────────────────
 async def main():
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
@@ -301,6 +275,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-
 
