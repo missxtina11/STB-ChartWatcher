@@ -20,3 +20,6 @@ venv/
 # Mac system files (optional)
 .DS_Store
 
+*.pyc
+__pycache__/
+.DS_Store
