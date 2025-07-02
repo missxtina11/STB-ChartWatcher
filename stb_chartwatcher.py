@@ -80,6 +80,36 @@ def _resolve_token(chat_id: int, arg: Optional[str]) -> Tuple[Optional[str], Opt
 # ─────────────────────── /start & /help ───────────────────────
 @dp.message(Command("start"))
 async def cmd_start(m: Message):
+
+from aiogram.types import BotCommand
+
+# …
+
+@dp.message(Command("start"))
+async def cmd_start(msg: Message):
+    await msg.answer(
+        "📊 *STB ChartWatcher Activated!*  \n"
+        "Track holders, whales, trades, and sentiment.\n"
+        "Type `help` for commands."
+    )
+
+    # Register the main commands with Telegram (done once every /start)
+    await bot.set_my_commands(
+        [
+            BotCommand(command="help", description="Show help"),
+            BotCommand(command="addtoken", description="Add token to watch-list"),
+            BotCommand(command="listtokens", description="List watched tokens"),
+            BotCommand(command="removetoken", description="Remove token"),
+            BotCommand(command="holderschart", description="Holder pie chart"),
+            BotCommand(command="whales", description="Top wallets"),
+            BotCommand(command="bubbles", description="Wallet clusters"),
+            BotCommand(command="buysells", description="Large trades"),
+            BotCommand(command="sentiment", description="AI sentiment"),
+            BotCommand(command="price", description="Token price"),
+            BotCommand(command="status", description="Bot status"),
+        ]
+    )
+
     await bot.set_my_commands(
         [
             BotCommand("help", "Show help"),
