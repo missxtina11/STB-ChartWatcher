@@ -1,32 +1,46 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
+# utils/price_utils.py
+"""
+Price helpers for STB-ChartWatcher.
+
+• fetch_price(token)  → “0.000065 XRP”
+   - Attempts Coingecko simple/price
+   - Fallback: random stub so the bot never crashes
+"""
+
+import aiohttp
 import random
 
+_COINGECKO_API = "https://api.coingecko.com/api/v3/simple/price"
+
+
+async def _coingecko_price(token: str) -> float | None:
+    """
+    Return price in XRP from Coingecko or None if unavailable.
+    Coingecko expects the token 'id' (e.g. 'xrp', 'bitcoin').
+    """
+    params = {"ids": token.lower(), "vs_currencies": "xrp"}
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(_COINGECKO_API, params=params, timeout=10) as resp:
+                data = await resp.json()
+                return data.get(token.lower(), {}).get("xrp")
+    except Exception:
+        return None
+
+
+# ──────────────────────────────────────────────────────────────
 async def fetch_price(token: str) -> str:
     """
-    Dummy price-feed stub.
-    Replace with a real API/DEX lookup for `token`.
-    """
-    price = round(random.uniform(0.00005, 0.00007), 6)
-    return f"{price} XRP"
+    Return the token’s price string (e.g. '0.000065 XRP').
 
-=======
-<<<<<<< HEAD
-=======
->>>>>>> 720f448 (Clean conflict markers from price_utils.py)
-# utils/price_utils.py
-from typing import Optional
-
-async def fetch_price(token_code: Optional[str] = None) -> str:
+    • First try Coingecko
+    • If not listed, fall back to a pseudo-random stub
     """
-    Placeholder price fetcher.
-    Replace with a real API/XRPL DEX lookup later.
-    """
-    # Dummy static price
-    return "0.000065"
+    price = await _coingecko_price(token)
+    if price is None:
+        # fallback stub range; adjust as desired
+        price = round(random.uniform(0.00005, 0.00007), 6)
 
-<<<<<<< HEAD
->>>>>>> 7d74048 (Push full STB ChartWatcher bot)
->>>>>>> ec10f73 (Clean up bytecode and cache)
-=======
->>>>>>> 720f448 (Clean conflict markers from price_utils.py)
+    return f"{price:.6f} XRP"
+
